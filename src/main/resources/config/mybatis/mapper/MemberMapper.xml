@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.user.mapper.MemberMapper">
+	<insert id="createMember" parameterType="member">
+		<selectKey keyProperty="midx" resultType="int" order="BEFORE">
+			select member_seq.nextval from dual
+		</selectKey>
+		insert into member(MIDX,EMAIL,PWD,MNAME,MHP1,MHP2,MHP3,MPOST,MADDR1,MADDR2,GRADE
+		,MDATE)
+		values(#{midx},#{email},#{pwd},#{mname},#{mhp1},#{mhp2},#{mhp3},#{mpost:VARCHAR},
+		#{maddr1:VARCHAR},#{maddr2:VARCHAR},'씨앗회원',sysdate)
+	</insert>
+	
+	<sql id="findWhere">
+		<if test="findKeyword!=''">
+			<where>
+				<if test="findType==1"> <!-- 이름 -->
+					MNAME like '%'||#{findKeyword}||'%'
+				</if>
+				<if test="findType==2"> <!-- 이메일 -->
+					EMAIL like '%' ||#{findKeyword}||'%'
+				</if>
+				<if test="findType==3"> <!-- 회원등급 -->
+					GRADE like '%' ||#{findKeyword}||'%'
+				</if>
+				
+			</where>
+		</if>
+	</sql>
+	
+	<select id="getMemberCount" resultType="_int" parameterType="Member">
+		select count(MIDX) from MEMBER
+		<include refid="findWhere"/>
+	</select>
+	
+	<select id="selectMemberAll" resultType="Member" parameterType="map">
+				select * from MEMBER order by MIDX desc
+			<![CDATA[
+			where rn > #{start} and rn < #{end}
+			]]>
+	</select>
+	
+	<select id="selectMemberAllPaging" resultType="Member" parameterType="Member">
+		select * from(
+		 		select row_number() over(order by m.midx desc,m.mdate asc) rn, 
+		 		m.midx,m.email,m.mname,m.mhp1,m.mhp2,m.mhp3,m.mpost,m.maddr1,m.maddr2,m.grade,m.mileage,m.mdate,m.enabled,a.auth
+				from MEMBER m Left Outer Join member_auth a on m.email =a.email
+				<include refid="findWhere"/>
+				)
+				<![CDATA[
+				where rn > #{start} and rn < #{end}
+				]]>
+	</select>
+
+
+
+	<select id="emailCheck" resultType="int"  parameterType="string">
+		select MIDX from member where EMAIL=#{value}
+	</select>
+	
+	<select id="findUser" parameterType="Member" resultType="Member">
+		select * from member where EMAIL=#{email}	
+	</select>
+	
+	<select id="listUser" resultType="Member" parameterType="com.user.model.PagingVO">
+		select member.*, decode(enabled,1,'일반회원', 0,'정지회원') statusStr
+		from member order by MIDX desc
+	</select>
+	
+	<select id="getMember" parameterType="int" resultType="Member">
+		select * from member where midx=#{value}	
+	</select>
+
+	<update id="updateUser" parameterType="Member">
+		update  member set enabled=#{enabled} where midx=#{midx}
+	</update>
+	
+	<update id="updateMemberInfo" parameterType="Member">
+		update member set mhp1=#{mhp1},mhp2=#{mhp2},mhp3=#{mhp3},mpost=#{mpost},maddr1=#{maddr1},maddr2=#{maddr2}
+		where midx=#{midx}
+	</update>
+	
+	<delete id="deleteUser" parameterType="_int">
+		delete from member where MIDX=#{value}
+	</delete>
+
+	
+	<!--이메일 찾기  -->
+	<select id="findemail" parameterType="Member" resultType="Member">
+		select * from member where mname=#{mname} and mhp1=#{mhp1} and mhp2=#{mhp2} and mhp3=#{mhp3}
+	</select>
+	<!--비밀번호 찾기  -->
+	<select id="findPassword" parameterType="Member" resultType="Member">
+		select * from member where email=#{email} and mname=#{mname} and mhp1=#{mhp1} and mhp2=#{mhp2} and mhp3=#{mhp3}
+	</select>
+	<!--비밀번호 변경  -->
+	<update id="updatePassword" parameterType="Member">
+		update member set pwd=#{pwd} where email=#{email}
+	</update>
+	
+	<!-- 등급 확인 -->
+	<select id="getGrade" parameterType="_int" resultType="String">
+		<![CDATA[
+		select max(grade) keep(dense_rank first order by gpoint desc) 
+		as max_text from grade where gpoint <=#{mileage}
+		]]> 
+	</select>
+	<!-- 등급 변경 -->
+	<update id="updateGrade" parameterType="Member">
+		update member set grade = #{grade}
+		where midx=#{midx}
+	</update>
+	<!-- 포인트 적립 -->
+	<update id="RewardMileage" parameterType="_int">
+		update member set mileage = mileage + #{point}
+		where midx=#{midx}
+	</update>
+	<!-- 포인트 확인 -->
+	<select id="getMileage" parameterType="_int" resultType="_int">
+		select mileage from member 
+		where midx=#{midx}	
+	</select>
+	
+	<resultMap type="com.user.model.MemberVO" id="memberMap">
+		<id property="email" column="email"/>
+		<result property="midx" column="midx"/>
+		<result property="email" column="email"/>
+		<result property="pwd" column="pwd"/>
+		<result property="mname" column="mname"/>
+		<result property="mhp1" column="mhp1"/>
+		<result property="mhp2" column="mhp2"/>
+		<result property="mhp3" column="mhp3"/>
+		<result property="mpost" column="mpost"/>
+		<result property="maddr1" column="maddr1"/>
+		<result property="maddr2" column="maddr2"/>
+		<result property="grade" column="grade"/>
+		<result property="mileage" column="mileage"/>
+		<result property="mdate" column="mdate"/>
+		<result property="enabled" column="enabled"/>
+		<collection property="authList" resultMap="authMap">
+		</collection>
+	</resultMap>
+	
+	<resultMap type="com.user.model.AuthVO" id="authMap">
+		<result property="email" column="email"/>
+		<result property="auth" column="auth"/>
+	</resultMap>
+	
+	<select id="read" resultMap="memberMap">
+		select mem.email,mem.midx,pwd,mname,mhp1,mhp2,mhp3,mpost,maddr1,maddr2,grade,mileage,mdate,enabled,auth
+		from member mem left outer join member_auth auth on mem.email = auth.email
+		where mem.email = #{email}
+	</select>
+	
+
+	<select id="getDrate" parameterType="Member" resultType="com.user.model.GradeVO">
+		select g.* from member m join grade g on m.grade = g.grade
+		where midx=#{midx}
+	</select>
+	
+	<select id="getNextGrade" parameterType="Member" resultType="com.user.model.GradeVO">
+		<![CDATA[ 
+		select * from grade
+		where gpoint > ${mileage} and rownum = 1 
+		order by gpoint asc
+		]]>
+	</select>
+
+
+
+</mapper>
